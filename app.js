@@ -3,6 +3,7 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
 import "./config/dbConfig.js";
 import { startBookingExpiryJob } from "./jobs/bookingExpiryJob.js";
 import cookieParser from "cookie-parser";
@@ -17,8 +18,6 @@ import aiItineraryRouter from "./routes/aiItineraryRoutes.js";
 import discussionRouter from "./routes/discussionRoutes.js";
 
 
-dotenv.config();
-startBookingExpiryJob();
 
 const app = express();
 const server = http.createServer(app);
@@ -71,4 +70,5 @@ app.use("/api/discussions", discussionRouter);
 
 server.listen(PORT, () => {
     console.log(`Server & WebSocket running on port ${PORT}`);
+startBookingExpiryJob();
 });

@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import pool from "../config/dbConfig.js";
 export const startBookingExpiryJob = () => {
     cron.schedule("* * * * *", async () => {
 
