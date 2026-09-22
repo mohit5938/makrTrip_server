@@ -57,6 +57,11 @@ app.use(cors({
     credentials: true,
 }));
 
+app.use((req, res, next) => {
+    req.url = req.url.replace(/\/{2,}/g, '/');
+    next();
+});
+
 app.use('/api/user', userRouter);
 app.use('/api/trip', tripRouter);
 app.use('/api/booking', bookingRouter);

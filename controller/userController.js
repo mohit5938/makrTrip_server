@@ -107,19 +107,23 @@ export const signup = async (req, res) => {
 
     // Send response
 
+      const isProduction = process.env.NODE_ENV === "production";
       res.cookie("token", token, {
           httpOnly: true,
-          secure: false,
-          sameSite: "strict",
+          secure: isProduction,
+          sameSite: isProduction ? "none" : "lax",
           maxAge: 7 * 24 * 60 * 60 * 1000,
       });
       
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      token,
-      user: newUser.rows[0],
-    });
+      const registeredUser = { ...newUser.rows[0] };
+      delete registeredUser.password;
+
+      res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        token,
+        user: registeredUser,
+      });
 
   } catch (error) {
    
@@ -263,10 +267,11 @@ export const verifyLoginOtp = async (req, res) => {
                 expiresIn: "7d",
             }
         );
+        const isProduction = process.env.NODE_ENV === "production";
         res.cookie("token", token, {
             httpOnly: true,
-            secure: false,
-            sameSite: "strict",
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -352,11 +357,11 @@ export const signin = async (req, res) => {
             }
         );
 
-        // Success response
+        const isProduction = process.env.NODE_ENV === "production";
         res.cookie("token", token, {
             httpOnly: true,
-            secure: false,
-            sameSite: "strict",
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 

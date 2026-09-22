@@ -4,6 +4,7 @@ import cloudinary from "../config/cloudinary.js";
 import { uploadImage }
   from "../utils/uploadImage.js";
 import axios from "axios";
+
 export const searchDestination = async (
     req,
     res
@@ -53,9 +54,7 @@ res.status(200).json({
 });
 
     } catch (error) {
-   console.log(error);
-
-        
+   console.log(error); 
 res.status(500).json({
   success: false,
   message:
