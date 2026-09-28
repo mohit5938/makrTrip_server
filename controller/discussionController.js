@@ -29,7 +29,7 @@ const ensureDiscussionsTable = async () => {
 export const checkUserTripAccess = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.userId || req.user?.id;
 
     if (!userId) {
       return res.status(200).json({
@@ -40,6 +40,13 @@ export const checkUserTripAccess = async (req, res) => {
     }
 
     const formattedTripId = String(tripId);
+
+    // Fetch user details for role verification
+    const { rows: userRows } = await pool.query(
+      `SELECT id, role, full_name FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const currentUser = userRows[0] || {};
 
     // 1. Check if user is the Host of the trip
     const { rows: tripRows } = await pool.query(
@@ -55,14 +62,14 @@ export const checkUserTripAccess = async (req, res) => {
       });
     }
 
-    // 2. Check if user has a confirmed booking for this trip
+    // 2. Check if user has a booking for this trip using traveler_id
     const { rows: bookingRows } = await pool.query(
       `
       SELECT id, booking_status 
       FROM bookings 
       WHERE trip_id::text = $1 
-        AND user_id = $2 
-        AND (booking_status = 'confirmed' OR payment_status = 'paid')
+        AND traveler_id = $2 
+        AND (booking_status = 'confirmed' OR payment_status = 'paid' OR booking_status = 'pending')
       LIMIT 1
       `,
       [formattedTripId, userId]
@@ -77,7 +84,7 @@ export const checkUserTripAccess = async (req, res) => {
     }
 
     // Also check if admin
-    if (req.user?.role === "admin") {
+    if (currentUser.role === "admin") {
       return res.status(200).json({
         success: true,
         hasAccess: true,
@@ -148,9 +155,19 @@ export const getTripDiscussions = async (req, res) => {
 export const postDiscussionMessage = async (req, res) => {
   try {
     await ensureDiscussionsTable();
-    const userId = req.user?.id;
-    const userName = req.user?.full_name || req.user?.name || "Traveler";
-    const userPhoto = req.user?.profile_image || "";
+    const userId = req.userId || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated." });
+    }
+
+    const { rows: userRows } = await pool.query(
+      `SELECT id, full_name, profile_image, role FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const currentUser = userRows[0] || {};
+    const userName = currentUser.full_name || "Traveler";
+    const userPhoto = currentUser.profile_image || "";
 
     const { tripId, message, isAnnouncement } = req.body || {};
     const formattedTripId = String(tripId).trim();
@@ -170,7 +187,7 @@ export const postDiscussionMessage = async (req, res) => {
     );
 
     const isHost = tripRows.length > 0 && String(tripRows[0].host_id) === String(userId);
-    const isAdmin = req.user?.role === "admin";
+    const isAdmin = currentUser.role === "admin";
 
     let userRole = isHost ? "host" : (isAdmin ? "admin" : "traveler");
 
@@ -179,8 +196,8 @@ export const postDiscussionMessage = async (req, res) => {
         `
         SELECT id FROM bookings 
         WHERE trip_id::text = $1 
-          AND user_id = $2 
-          AND (booking_status = 'confirmed' OR payment_status = 'paid')
+          AND traveler_id = $2 
+          AND (booking_status = 'confirmed' OR payment_status = 'paid' OR booking_status = 'pending')
         LIMIT 1
         `,
         [formattedTripId, userId]
@@ -189,7 +206,7 @@ export const postDiscussionMessage = async (req, res) => {
       if (bookingRows.length === 0) {
         return res.status(403).json({
           success: false,
-          message: "Only travelers with confirmed bookings can chat in this room.",
+          message: "Only travelers with bookings can chat in this room.",
         });
       }
     }
@@ -244,7 +261,7 @@ export const deleteDiscussionMessage = async (req, res) => {
   try {
     await ensureDiscussionsTable();
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = req.userId || req.user?.id;
 
     const { rows: msgRows } = await pool.query(
       `SELECT id, trip_id, user_id FROM trip_discussions WHERE id = $1 LIMIT 1`,
@@ -265,7 +282,12 @@ export const deleteDiscussionMessage = async (req, res) => {
     );
 
     const isHost = tripRows.length > 0 && String(tripRows[0].host_id) === String(userId);
-    const isAdmin = req.user?.role === "admin";
+
+    const { rows: userRows } = await pool.query(
+      `SELECT role FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const isAdmin = userRows[0]?.role === "admin";
 
     if (!isAuthor && !isHost && !isAdmin) {
       return res.status(403).json({
