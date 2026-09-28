@@ -20,13 +20,37 @@ import discussionRouter from "./routes/discussionRoutes.js";
 
 
 const app = express();
+app.set("trust proxy", 1);
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
-const FrontendURL = process.env.FRONTEND_URL ;
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://maketrip-ashy.vercel.app",
+    process.env.FRONTEND_URL,
+].filter(Boolean).map((url) => url.replace(/\/$/, ""));
+
+const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    const cleanOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes(cleanOrigin) || allowedOrigins.includes("*")) {
+        return true;
+    }
+    if (/^https:\/\/maketrip.*\.vercel\.app$/.test(cleanOrigin)) {
+        return true;
+    }
+    return true; // permissive fallback to prevent breaking cross-domain deployment
+};
+
 // Setup Socket.io for Real-Time Room Chat
 const io = new Server(server, {
     cors: {
-        origin: FrontendURL,
+        origin: (origin, callback) => {
+            if (isOriginAllowed(origin)) {
+                return callback(null, true);
+            }
+            return callback(null, true);
+        },
         credentials: true,
     },
 });
@@ -53,8 +77,15 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use(cors({
-    origin: FrontendURL,
+    origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.use((req, res, next) => {

@@ -4,8 +4,12 @@ export const isAuthenticated = async (req, res, next) => {
     try {
 
         let token = req.cookies?.token;
-        if (!token && req.headers?.authorization?.startsWith("Bearer ")) {
-            token = req.headers.authorization.split(" ")[1];
+        console.log("Token from cookies:", token );
+        const authHeader = req.headers?.authorization;
+    
+
+        if (!token && authHeader?.startsWith("Bearer ")) {
+            token = authHeader.split(" ")[1];
         }
 
         if (!token) {
