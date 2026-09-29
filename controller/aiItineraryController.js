@@ -58,31 +58,43 @@ Return ONLY raw JSON in this exact structure with no markdown codeblock delimite
   "foodRecommendations": ["Local Specialty 1", "Recommended Spot 2"]
 }`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-    {
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
       }),
+    });
+
+    // Retry on 503 (overloaded) with exponential backoff
+    if (response.status === 503 && attempt < MAX_RETRIES) {
+      const waitMs = attempt * 1500;
+      console.warn(`Gemini 503 (attempt ${attempt}/${MAX_RETRIES}), retrying in ${waitMs}ms...`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
     }
-  );
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Google Gemini API Error (${response.status}): ${errorBody}`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Google Gemini API Error (${response.status}): ${errorBody}`);
+    }
+
+    const data = await response.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    } else {
+      throw new Error("Gemini AI did not return a valid JSON structure.");
+    }
   }
 
-  const data = await response.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
-  } else {
-    throw new Error("Gemini AI did not return a valid JSON structure.");
-  }
+  throw new Error("Gemini AI is temporarily unavailable due to high demand. Please try again in a moment.");
 };
 
 /* ====================================================
