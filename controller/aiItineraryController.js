@@ -59,7 +59,7 @@ Return ONLY raw JSON in this exact structure with no markdown codeblock delimite
 }`;
 
   const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 5;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetch(GEMINI_URL, {
@@ -72,7 +72,7 @@ Return ONLY raw JSON in this exact structure with no markdown codeblock delimite
 
     // Retry on 503 (overloaded) with exponential backoff
     if (response.status === 503 && attempt < MAX_RETRIES) {
-      const waitMs = attempt * 1500;
+      const waitMs = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s, 16s
       console.warn(`Gemini 503 (attempt ${attempt}/${MAX_RETRIES}), retrying in ${waitMs}ms...`);
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
